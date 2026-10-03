@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dopamine IPA Installer</title>
+<style>
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:#fff;color:#111;font:16px/1.6 -apple-system,Helvetica,Arial,sans-serif}
+  .top{display:flex;justify-content:space-between;align-items:center;max-width:680px;margin:0 auto;padding:14px 20px;border-bottom:1px solid #eee}
+  .langs button{width:auto;margin:0 6px 0 0;padding:6px 14px;background:#fff;color:#111;border:1px solid #ccc;border-radius:20px;font-size:14px;cursor:pointer}
+  .langs button.on{background:#111;color:#fff;border-color:#111}
+  .brand{font-size:14px;color:#555}
+  nav{max-width:680px;margin:0 auto;padding:10px 20px 0;font-size:14px}
+  nav a{margin-right:16px;color:#555;text-decoration:none}
+  nav a:hover{color:#111;text-decoration:underline}
+  main{max-width:680px;margin:0 auto;padding:16px 20px 64px}
+  h1{font-size:28px;margin:16px 0 4px}
+  h2{font-size:20px;margin:44px 0 8px}
+  p,li{color:#333}
+  .sub{color:#666;margin:0 0 20px}
+  .card{border:1px solid #ddd;border-radius:12px;padding:20px}
+  label{display:block;font-weight:600;margin:14px 0 6px}
+  label:first-child{margin-top:0}
+  select,.btn{width:100%;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111}
+  select:disabled{background:#f5f5f5;color:#999}
+  .btn{background:#111;color:#fff;border-color:#111;margin-top:16px;cursor:pointer}
+  .btn.alt{background:#fff;color:#111;border-color:#ccc;margin-top:8px}
+  .btn:disabled{background:#ccc;border-color:#ccc;color:#fff;cursor:not-allowed}
+  #result{margin-top:16px;padding:12px 14px;border-radius:8px;border:1px solid #ddd;font-size:15px;min-height:48px}
+  #result.ok{border-color:#111}
+  #result.no{background:#f7f7f7}
+  .meta{font-size:13px;color:#777;margin-top:10px}
+  .note{border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin:16px 0;font-size:15px}
+  .note.dark{border-color:#111}
+  ol,ul{padding-left:22px}
+  .steps{list-style:none;padding:0}
+  .steps li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0}
+  .steps input{margin-top:6px;width:18px;height:18px;flex:none}
+  .steps li.done span{color:#999;text-decoration:line-through}
+  #prog{font-size:14px;color:#777}
+  details{border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin:8px 0}
+  summary{cursor:pointer;font-weight:600}
+  a{color:#111}
+  code{background:#f3f3f3;padding:1px 5px;border-radius:4px}
+  footer{margin-top:48px;font-size:13px;color:#777}
+  :focus-visible{outline:2px solid #111;outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="langs"><button id="l-en" class="on">English</button><button id="l-ru">Русский</button></div>
+  <div class="brand">&copy; Volt0d</div>
+</div>
+<nav><a href="#dl" data-i="nDl"></a><a href="#guide" data-i="nGuide"></a><a href="#sileo" data-i="nSileo"></a><a href="#help" data-i="nHelp"></a></nav>
+
+<main>
+  <h1 data-i="title"></h1>
+  <p class="sub" data-i="sub"></p>
+
+  <section class="card" id="dl">
+    <label for="device" data-i="dev"></label>
+    <select id="device"></select>
+    <label for="version" data-i="ver"></label>
+    <select id="version" disabled></select>
+    <div id="result" role="status"></div>
+    <button class="btn" id="install" disabled data-i="install"></button>
+    <button class="btn alt" id="copy" data-i="copy"></button>
+    <div class="meta" id="rel"></div>
+  </section>
+
+  <div class="note dark" data-i="backup"></div>
+
+  <h2 id="guide" data-i="gT"></h2>
+  <p id="prog"></p>
+  <ul class="steps" id="steps"></ul>
+
+  <h2 id="flash" data-i="fT"></h2>
+  <p data-i="fP"></p>
+
+  <h2 id="sileo" data-i="sT"></h2>
+  <p data-i="sP"></p>
+  <ol id="sileoList"></ol>
+
+  <h2 data-i="tT"></h2>
+  <p data-i="tP"></p>
+
+  <h2 data-i="idT"></h2>
+  <p data-i="idP"></p>
+
+  <h2 data-i="oT"></h2>
+  <p data-i="oP"></p>
+
+  <h2 id="help" data-i="hT"></h2>
+  <div id="trouble"></div>
+
+  <footer data-i="foot"></footer>
+</main>
+
+<script>
+// ---------- Settings ----------
+const REPO = "opa334/Dopamine";
+let IPA_URL = "https://github.com/" + REPO + "/releases/latest/download/Dopamine.ipa"; // one IPA for all devices
+
+// [name, chip, highest iOS the iPhone can run]
+const DEVICES = [
+  ["iPhone 6s / 6s Plus / SE (1st gen)","A9","15.8.8"],["iPhone 7 / 7 Plus","A10","15.8.8"],
+  ["iPhone 8 / 8 Plus / X","A11","16.7.16"],["iPhone XR / XS / XS Max","A12","18.7.7"],
+  ["iPhone 11 / 11 Pro / 11 Pro Max","A13","26.3"],["iPhone SE (2nd gen)","A13","26.3"],
+  ["iPhone 12 / mini / Pro / Pro Max","A14","26.3"],["iPhone 13 / mini / Pro / Pro Max","A15","26.3"],
+  ["iPhone SE (3rd gen)","A15","26.3"],["iPhone 14 / 14 Plus","A15","26.3"],
+  ["iPhone 14 Pro / 14 Pro Max","A16","26.3"],["iPhone 15 / 15 Plus","A16","26.3"],
+  ["iPhone 15 Pro / 15 Pro Max","A17","26.3"]
+];
+const R = (p,a,b)=>Array.from({length:b-a+1},(_,i)=>p+(a+i));
+const VERSIONS = [
+  "15.0","15.0.1","15.0.2","15.1","15.1.1","15.2","15.2.1","15.3","15.3.1","15.4","15.4.1","15.5","15.6","15.6.1",
+  "15.7",...R("15.7.",1,9),"15.8",...R("15.8.",1,8),
+  "16.0","16.0.1","16.0.2","16.0.3","16.1","16.1.1","16.1.2","16.2","16.3","16.3.1","16.4","16.4.1","16.5","16.5.1","16.6","16.6.1","16.7",...R("16.7.",1,16),
+  "17.0","17.0.1","17.0.2","17.0.3","17.1","17.1.1","17.1.2","17.2","17.2.1","17.3","17.3.1","17.4","17.4.1","17.5","17.5.1","17.6","17.6.1","17.7",...R("17.7.",1,10),
+  "18.0","18.0.1","18.1","18.1.1","18.2","18.2.1","18.3","18.3.1","18.3.2","18.4","18.4.1","18.5","18.6","18.6.1","18.6.2","18.7",...R("18.7.",1,7),
+  "26.0","26.0.1","26.1","26.2","26.2.1","26.3"
+];
+// Support by chip (Dopamine 3.x). Check github.com/opa334/Dopamine for changes.
+const RANGES = {A9:"15.0 – 18.7.1",A10:"15.0 – 18.7.1",A11:"15.0 – 18.7.1",A12:"15.0 – 18.7.1, 26.0 – 26.0.1",A13:"15.0 – 18.7.1, 26.0 – 26.0.1",A14:"15.0 – 17.3.1",A15:"15.0 – 17.3.1",A16:"15.0 – 17.3.1",A17:"15.0 – 17.3.1"};
+const num = v=>v.split(".").map(Number);
+const cmp=(a,b)=>{const x=num(a),y=num(b);for(let i=0;i<3;i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+function supported(chip,v){
+  if(cmp(v,"15.0")<0)return false;
+  if(["A9","A10","A11"].includes(chip))return cmp(v,"18.7.1")<=0;
+  if(["A12","A13"].includes(chip))return cmp(v,"18.7.1")<=0||(cmp(v,"26.0")>=0&&cmp(v,"26.0.1")<=0);
+  return cmp(v,"17.3.1")<=0;
+}
+
+// ---------- Text ----------
+const T = {
+en:{
+ nDl:"Download",nGuide:"Install guide",nSileo:"Sileo missing?",nHelp:"Help",
+ title:"Dopamine IPA Installer",sub:"Choose your iPhone and iOS version. We check compatibility and download the Dopamine IPA by opa334.",
+ dev:"1. iPhone model",ver:"2. iOS version",selDev:"Select your iPhone",selVer:"Select iOS version",
+ install:"Install",copy:"Copy download link",copied:"Link copied",
+ ok:"Supported. {d} ({c}) can use Dopamine on iOS {v}.",no:"Not supported. Dopamine does not work on {c} devices with iOS {v}.",
+ pick:"Pick a device and a version to check compatibility.",range:"{c} supports iOS {r}.",
+ latest:"Latest release: {t} ({s} MB, {d})",
+ backup:"<strong>Backup recommended.</strong> Make a backup of your iPhone (iCloud, or Finder/iTunes on a computer) before you install.",
+ gT:"Install guide",prog:"{n} of {m} steps done",
+ steps:[
+  "Make a backup of your iPhone.",
+  "Install <a href='https://sideloadly.io/#download' target='_blank' rel='noopener'>Sideloadly</a> (Windows / macOS, official site: <a href='https://sideloadly.io' target='_blank' rel='noopener'>sideloadly.io</a>). On Windows also install iTunes and iCloud from <a href='https://www.apple.com/itunes/' target='_blank' rel='noopener'>apple.com</a>, not the Microsoft Store.",
+  "Connect your iPhone with a USB cable, unlock it and tap <b>Trust</b>.",
+  "Download <code>Dopamine.ipa</code> with the Install button above.",
+  "Open Sideloadly and drag the IPA into it.",
+  "Choose your iPhone, enter your Apple ID (a free account works) and click <b>Start</b>. Wait for &quot;Done&quot;.",
+  "On the iPhone open <b>Settings → General → VPN &amp; Device Management</b>, tap your Apple ID and tap <b>Trust</b>.",
+  "iOS 16 and later: turn on <b>Settings → Privacy &amp; Security → Developer Mode</b> and restart the phone.",
+  "Open the Dopamine app and tap <b>Jailbreak</b>. Wait until it finishes.",
+  "Open <b>Sileo</b> from the Home Screen. Sideloaded apps expire after 7 days on a free Apple ID: re-sign with Sideloadly when needed."],
+ fT:"Screen flashing during install",fP:"Do not be afraid if the screen flashes, turns black or the iPhone respring/restarts while Dopamine runs. This is normal. Do not unplug or touch the phone and wait until Dopamine says it is finished. If the phone locks, open Dopamine again.",
+ sT:"Sileo did not appear",sP:"If the jailbreak finished but there is no Sileo icon, try this in order:",
+ sileo:["Swipe down on the Home Screen and search for &quot;Sileo&quot;. Also check the App Library.","Restart the iPhone, open Dopamine and tap <b>Jailbreak</b> again.","Open Dopamine <b>Settings</b> and use the option to <b>reinstall the package manager</b>, then jailbreak again. You can pick Zebra instead of Sileo.","Still nothing: re-sign and reinstall Dopamine with Sideloadly, then repeat the jailbreak."],
+ tT:"Tweaks: stay safe",tP:"Install only verified tweaks from trusted repositories. If you are not sure about a tweak or repo, ask an AI assistant before you install it. The author personally recommends <b>Claude</b> and <b>ChatGPT</b>. Check the tweak name, repo and iOS version support, and read reviews.",
+ idT:"Why Sideloadly asks for an Apple ID",idP:"Apple only runs apps that are signed with a developer certificate. Sideloadly signs the IPA for you, so it logs in to Apple with your Apple ID to get a free certificate. It is not your iCloud backup, and this website never sees it. According to Sideloadly the login goes only to Apple. You can use a separate Apple ID made just for sideloading.",
+ oT:"Is the file modified?",oP:"No. This site does not host or change anything. The button downloads the original <code>Dopamine.ipa</code> straight from the official <a href='https://github.com/opa334/Dopamine/releases' target='_blank' rel='noopener'>opa334/Dopamine releases</a>.",
+ hT:"Troubleshooting",
+ trouble:[
+  ["The app does not appear on the Home Screen","Check that Sideloadly ended with &quot;Done&quot;, then search for &quot;Dopamine&quot; in Spotlight and the App Library."],
+  ["&quot;Untrusted Developer&quot; message","Trust your Apple ID in Settings → General → VPN &amp; Device Management."],
+  ["The app closes at once or does not open","Turn on Developer Mode (iOS 16+) and restart. If 7 days passed, install the IPA again."],
+  ["Sideloadly does not see my iPhone","Unlock the phone, tap Trust, change cable or USB port, and reinstall iTunes and iCloud from apple.com (Windows)."],
+  ["Apple ID or &quot;too many apps&quot; error","Free accounts have weekly limits. Remove old sideloaded apps or use another Apple ID."],
+  ["The jailbreak fails or the phone reboots","Reboot, open Dopamine and try again. Some devices need several attempts."]],
+ foot:"Unofficial download helper. Dopamine is made by <a href='https://github.com/opa334/Dopamine' target='_blank' rel='noopener'>opa334</a>. Use at your own risk."
+},
+ru:{
+ nDl:"Скачать",nGuide:"Инструкция",nSileo:"Нет Sileo?",nHelp:"Помощь",
+ title:"Установка Dopamine (IPA)",sub:"Выберите iPhone и версию iOS. Мы проверим совместимость и скачаем IPA Dopamine от opa334.",
+ dev:"1. Модель iPhone",ver:"2. Версия iOS",selDev:"Выберите iPhone",selVer:"Выберите версию iOS",
+ install:"Установить",copy:"Скопировать ссылку",copied:"Ссылка скопирована",
+ ok:"Поддерживается. {d} ({c}) может использовать Dopamine на iOS {v}.",no:"Не поддерживается. Dopamine не работает на устройствах {c} с iOS {v}.",
+ pick:"Выберите устройство и версию, чтобы проверить совместимость.",range:"{c} поддерживает iOS {r}.",
+ latest:"Последний релиз: {t} ({s} МБ, {d})",
+ backup:"<strong>Рекомендуем сделать резервную копию.</strong> Перед установкой сделайте копию iPhone (iCloud или Finder/iTunes на компьютере).",
+ gT:"Инструкция по установке",prog:"Выполнено шагов: {n} из {m}",
+ steps:[
+  "Сделайте резервную копию iPhone.",
+  "Установите <a href='https://sideloadly.io/#download' target='_blank' rel='noopener'>Sideloadly</a> (Windows / macOS, официальный сайт: <a href='https://sideloadly.io' target='_blank' rel='noopener'>sideloadly.io</a>). На Windows также поставьте iTunes и iCloud с <a href='https://www.apple.com/itunes/' target='_blank' rel='noopener'>apple.com</a>, не из Microsoft Store.",
+  "Подключите iPhone по USB, разблокируйте и нажмите <b>«Доверять»</b>.",
+  "Скачайте <code>Dopamine.ipa</code> кнопкой «Установить» выше.",
+  "Откройте Sideloadly и перетащите в него IPA.",
+  "Выберите iPhone, введите Apple ID (подойдёт бесплатный) и нажмите <b>Start</b>. Дождитесь «Done».",
+  "На iPhone откройте <b>Настройки → Основные → VPN и управление устройством</b>, нажмите на свой Apple ID и <b>«Доверять»</b>.",
+  "iOS 16 и новее: включите <b>Настройки → Конфиденциальность и безопасность → Режим разработчика</b> и перезагрузите телефон.",
+  "Откройте приложение Dopamine и нажмите <b>Jailbreak</b>. Дождитесь окончания.",
+  "Откройте <b>Sileo</b> на экране «Домой». С бесплатным Apple ID приложение работает 7 дней, потом подпишите его снова в Sideloadly."],
+ fT:"Мигание экрана при установке",fP:"Не пугайтесь, если экран мигает, гаснет или iPhone перезапускается во время работы Dopamine. Это нормально. Не отключайте и не трогайте телефон, дождитесь сообщения Dopamine об окончании. Если телефон заблокировался, откройте Dopamine снова.",
+ sT:"Sileo не появился",sP:"Если джейлбрейк завершился, а значка Sileo нет, попробуйте по порядку:",
+ sileo:["Потяните экран вниз и найдите «Sileo» в поиске. Проверьте и Библиотеку приложений.","Перезагрузите iPhone, откройте Dopamine и снова нажмите <b>Jailbreak</b>.","В <b>настройках</b> Dopamine выберите <b>переустановку менеджера пакетов</b> и снова сделайте джейлбрейк. Вместо Sileo можно выбрать Zebra.","Не помогло: заново подпишите и установите Dopamine через Sideloadly и повторите джейлбрейк."],
+ tT:"Твики: безопасность",tP:"Устанавливайте только проверенные твики из надёжных репозиториев. Если сомневаетесь в твике или репозитории, посоветуйтесь с нейросетью до установки. Лично автор рекомендует <b>Claude</b> и <b>ChatGPT</b>. Проверяйте название твика, репозиторий, поддержку вашей версии iOS и читайте отзывы.",
+ idT:"Зачем Sideloadly просит Apple ID",idP:"Apple запускает только приложения, подписанные сертификатом разработчика. Sideloadly подписывает IPA за вас, поэтому входит в Apple через ваш Apple ID и получает бесплатный сертификат. Это не резервная копия iCloud, и этот сайт данные не видит. По заявлению Sideloadly, вход идёт только в Apple. Можно создать отдельный Apple ID только для сайдлоада.",
+ oT:"Файл изменён?",oP:"Нет. Сайт ничего не хранит и не меняет. Кнопка скачивает оригинальный <code>Dopamine.ipa</code> прямо с официальных <a href='https://github.com/opa334/Dopamine/releases' target='_blank' rel='noopener'>релизов opa334/Dopamine</a>.",
+ hT:"Если что-то не получается",
+ trouble:[
+  ["Приложение не появилось на экране «Домой»","Проверьте, что Sideloadly закончил с «Done», и найдите «Dopamine» через поиск и в Библиотеке приложений."],
+  ["Сообщение «Ненадёжный разработчик»","Нажмите «Доверять» для своего Apple ID в Настройки → Основные → VPN и управление устройством."],
+  ["Приложение сразу закрывается или не открывается","Включите режим разработчика (iOS 16+) и перезагрузитесь. Если прошло 7 дней, установите IPA заново."],
+  ["Sideloadly не видит iPhone","Разблокируйте телефон, нажмите «Доверять», смените кабель или порт и переустановите iTunes и iCloud с apple.com (Windows)."],
+  ["Ошибка Apple ID или «слишком много приложений»","У бесплатных аккаунтов есть недельный лимит. Удалите старые приложения или используйте другой Apple ID."],
+  ["Джейлбрейк не проходит или телефон перезагружается","Перезагрузите телефон, откройте Dopamine и повторите. Иногда нужно несколько попыток."]],
+ foot:"Неофициальный помощник для загрузки. Dopamine создан <a href='https://github.com/opa334/Dopamine' target='_blank' rel='noopener'>opa334</a>. Используйте на свой риск."
+}};
+
+// ---------- State ----------
+const $=id=>document.getElementById(id);
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let lang=store.get("lang")||"en"; if(!T[lang])lang="en";
+let relInfo=null;
+const f=(s,o)=>s.replace(/\{(\w+)\}/g,(_,k)=>o[k]);
+
+function buildSelects(){
+  const d=$("device"),keep=d.value;
+  d.innerHTML="";d.add(new Option(T[lang].selDev,""));
+  DEVICES.forEach((x,i)=>d.add(new Option(x[0],i)));
+  d.value=keep;fillVersions();
+}
+function fillVersions(){
+  const v=$("version"),keep=v.value;
+  v.innerHTML="";v.add(new Option(T[lang].selVer,""));
+  const d=$("device").value;
+  v.disabled=d==="";
+  if(d!==""){VERSIONS.filter(x=>cmp(x,DEVICES[d][2])<=0).reverse().forEach(x=>v.add(new Option(x,x)))}
+  v.value=[...v.options].some(o=>o.value===keep)?keep:"";
+}
+function check(){
+  const d=$("device").value,v=$("version").value,r=$("result"),b=$("install"),t=T[lang];
+  r.className="";b.disabled=true;
+  if(d===""){r.textContent=t.pick;return}
+  const [name,chip]=DEVICES[d];
+  if(v===""){r.textContent=f(t.range,{c:chip,r:RANGES[chip]});return}
+  if(supported(chip,v)){r.className="ok";r.textContent=f(t.ok,{d:name,c:chip,v});b.disabled=false}
+  else{r.className="no";r.textContent=f(t.no,{c:chip,v})+" "+f(t.range,{c:chip,r:RANGES[chip]})}
+  store.set("dev",d);store.set("ver",v);
+}
+function renderRel(){
+  if(!relInfo){$("rel").textContent="";return}
+  $("rel").textContent=f(T[lang].latest,relInfo);
+}
+function renderSteps(){
+  const done=JSON.parse(store.get("done")||"[]"),S=T[lang].steps,ul=$("steps");
+  ul.innerHTML="";
+  S.forEach((s,i)=>{
+    const li=document.createElement("li"),cb=document.createElement("input"),sp=document.createElement("span");
+    cb.type="checkbox";cb.checked=done.includes(i);sp.innerHTML=s;
+    li.className=cb.checked?"done":"";
+    cb.onchange=()=>{const a=JSON.parse(store.get("done")||"[]").filter(x=>x!==i);if(cb.checked)a.push(i);store.set("done",JSON.stringify(a));renderSteps()};
+    li.append(cb,sp);ul.append(li);
+  });
+  $("prog").textContent=f(T[lang].prog,{n:done.filter(i=>i<S.length).length,m:S.length});
+}
+function render(){
+  const t=T[lang];document.documentElement.lang=lang;
+  document.querySelectorAll("[data-i]").forEach(e=>e.innerHTML=t[e.dataset.i]);
+  $("l-en").className=lang==="en"?"on":"";$("l-ru").className=lang==="ru"?"on":"";
+  $("sileoList").innerHTML=t.sileo.map(x=>"<li>"+x+"</li>").join("");
+  $("trouble").innerHTML=t.trouble.map(x=>"<details><summary>"+x[0]+"</summary><p>"+x[1]+"</p></details>").join("");
+  buildSelects();check();renderSteps();renderRel();
+}
+
+// ---------- Events ----------
+$("l-en").onclick=()=>{lang="en";store.set("lang",lang);render()};
+$("l-ru").onclick=()=>{lang="ru";store.set("lang",lang);render()};
+$("device").onchange=()=>{fillVersions();check()};
+$("version").onchange=check;
+$("install").onclick=()=>{window.location.href=IPA_URL};
+$("copy").onclick=async()=>{
+  try{await navigator.clipboard.writeText(IPA_URL)}catch(e){prompt("URL",IPA_URL);return}
+  const b=$("copy");b.textContent=T[lang].copied;setTimeout(()=>b.textContent=T[lang].copy,1500);
+};
+
+// ---------- Init ----------
+render();
+{const d=store.get("dev"),v=store.get("ver");
+ if(d!==null&&DEVICES[d]){$("device").value=d;fillVersions();if(v&&[...$("version").options].some(o=>o.value===v))$("version").value=v;check()}}
+
+// Latest release info from GitHub (falls back silently)
+fetch("https://api.github.com/repos/"+REPO+"/releases/latest").then(r=>r.ok?r.json():Promise.reject()).then(j=>{
+  const a=(j.assets||[]).find(x=>/\.ipa$/i.test(x.name));
+  if(a)IPA_URL=a.browser_download_url;
+  relInfo={t:j.tag_name,s:a?(a.size/1048576).toFixed(1):"?",d:(j.published_at||"").slice(0,10)};
+  renderRel();
+}).catch(()=>{});
+</script>
+</body>
+</html>
