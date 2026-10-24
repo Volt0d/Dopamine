@@ -23,9 +23,10 @@
   .card{border:1px solid #ddd;border-radius:12px;padding:20px}
   label{display:block;font-weight:600;margin:14px 0 6px}
   label:first-child{margin-top:0}
-  select,.btn{width:100%;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111}
+  select,input[type=text],.btn{width:100%;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111}
+  input[type=text]{margin-top:8px;display:none}
   select:disabled{background:#f5f5f5;color:#999}
-  .btn{background:#111;color:#fff;border-color:#111;margin-top:16px;cursor:pointer}
+  .btn{display:block;background:#111;color:#fff;border-color:#111;margin-top:16px;cursor:pointer;text-align:center;text-decoration:none}
   .btn.alt{background:#fff;color:#111;border-color:#ccc;margin-top:8px}
   .btn:disabled{background:#ccc;border-color:#ccc;color:#fff;cursor:not-allowed}
   #result{margin-top:16px;padding:12px 14px;border-radius:8px;border:1px solid #ddd;font-size:15px;min-height:48px}
@@ -64,12 +65,16 @@
     <select id="device"></select>
     <label for="version" data-i="ver"></label>
     <select id="version" disabled></select>
+    <input type="text" id="other" inputmode="decimal" autocomplete="off">
     <div id="result" role="status"></div>
     <button class="btn" id="install" disabled data-i="install"></button>
     <button class="btn alt" id="copy" data-i="copy"></button>
+    <a class="btn alt" id="rels" target="_blank" rel="noopener" href="https://github.com/opa334/Dopamine/releases" data-i="rels"></a>
     <div class="meta" id="rel"></div>
+    <div class="meta" id="src"></div>
   </section>
 
+  <div class="note" data-i="news"></div>
   <div class="note dark" data-i="backup"></div>
 
   <h2 id="guide" data-i="gT"></h2>
@@ -99,19 +104,29 @@
 </main>
 
 <script>
-// ---------- Settings ----------
+// ---------- Live data (nothing here needs manual updates) ----------
+// On every visit the page asks GitHub for: (1) the newest Dopamine release + its IPA,
+// (2) the supported iOS ranges, read from the official README.
 const REPO = "opa334/Dopamine";
-let IPA_URL = "https://github.com/" + REPO + "/releases/latest/download/Dopamine.ipa"; // one IPA for all devices
+let IPA_URL = "https://github.com/" + REPO + "/releases/latest/download/Dopamine.ipa";
+
+// Fallback table, used only if the README cannot be read or its format changes.
+const FALLBACK = {
+  arm64:  [["15.0","18.7.1"]],                       // A9 - A11
+  a12:    [["15.0","18.7.1"],["26.0","26.0.1"]],     // A12 / A13
+  arm64e: [["15.0","17.3.1"]]                        // A14 - A17
+};
+let RG = FALLBACK, srcLive = false;
 
 // [name, chip, highest iOS the iPhone can run]
 const DEVICES = [
   ["iPhone 6s / 6s Plus / SE (1st gen)","A9","15.8.8"],["iPhone 7 / 7 Plus","A10","15.8.8"],
   ["iPhone 8 / 8 Plus / X","A11","16.7.16"],["iPhone XR / XS / XS Max","A12","18.7.7"],
-  ["iPhone 11 / 11 Pro / 11 Pro Max","A13","26.3"],["iPhone SE (2nd gen)","A13","26.3"],
-  ["iPhone 12 / mini / Pro / Pro Max","A14","26.3"],["iPhone 13 / mini / Pro / Pro Max","A15","26.3"],
-  ["iPhone SE (3rd gen)","A15","26.3"],["iPhone 14 / 14 Plus","A15","26.3"],
-  ["iPhone 14 Pro / 14 Pro Max","A16","26.3"],["iPhone 15 / 15 Plus","A16","26.3"],
-  ["iPhone 15 Pro / 15 Pro Max","A17","26.3"]
+  ["iPhone 11 / 11 Pro / 11 Pro Max","A13","99"],["iPhone SE (2nd gen)","A13","99"],
+  ["iPhone 12 / mini / Pro / Pro Max","A14","99"],["iPhone 13 / mini / Pro / Pro Max","A15","99"],
+  ["iPhone SE (3rd gen)","A15","99"],["iPhone 14 / 14 Plus","A15","99"],
+  ["iPhone 14 Pro / 14 Pro Max","A16","99"],["iPhone 15 / 15 Plus","A16","99"],
+  ["iPhone 15 Pro / 15 Pro Max","A17","99"],["iPhone 16 and newer","A18+","99"]
 ];
 const R = (p,a,b)=>Array.from({length:b-a+1},(_,i)=>p+(a+i));
 const VERSIONS = [
@@ -121,28 +136,42 @@ const VERSIONS = [
   "17.0","17.0.1","17.0.2","17.0.3","17.1","17.1.1","17.1.2","17.2","17.2.1","17.3","17.3.1","17.4","17.4.1","17.5","17.5.1","17.6","17.6.1","17.7",...R("17.7.",1,10),
   "18.0","18.0.1","18.1","18.1.1","18.2","18.2.1","18.3","18.3.1","18.3.2","18.4","18.4.1","18.5","18.6","18.6.1","18.6.2","18.7",...R("18.7.",1,7),
   "26.0","26.0.1","26.1","26.2","26.2.1","26.3"
-];
-// Support by chip (Dopamine 3.x). Check github.com/opa334/Dopamine for changes.
-const RANGES = {A9:"15.0 – 18.7.1",A10:"15.0 – 18.7.1",A11:"15.0 – 18.7.1",A12:"15.0 – 18.7.1, 26.0 – 26.0.1",A13:"15.0 – 18.7.1, 26.0 – 26.0.1",A14:"15.0 – 17.3.1",A15:"15.0 – 17.3.1",A16:"15.0 – 17.3.1",A17:"15.0 – 17.3.1"};
-const num = v=>v.split(".").map(Number);
+];  // Versions that are missing here can be typed in with "Other version".
+
+const num=v=>v.split(".").map(Number);
 const cmp=(a,b)=>{const x=num(a),y=num(b);for(let i=0;i<3;i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+const grp=c=>["A9","A10","A11"].includes(c)?"arm64":["A12","A13"].includes(c)?"a12":["A14","A15","A16","A17"].includes(c)?"arm64e":null;
+const fmt=g=>g?RG[g].map(r=>r[0]+" – "+r[1]).join(", "):"";
 function supported(chip,v){
-  if(cmp(v,"15.0")<0)return false;
-  if(["A9","A10","A11"].includes(chip))return cmp(v,"18.7.1")<=0;
-  if(["A12","A13"].includes(chip))return cmp(v,"18.7.1")<=0||(cmp(v,"26.0")>=0&&cmp(v,"26.0.1")<=0);
-  return cmp(v,"17.3.1")<=0;
+  const g=grp(chip);
+  return !!g && RG[g].some(([lo,hi])=>cmp(v,lo)>=0&&cmp(v,hi)<=0);
+}
+// Reads e.g. "iOS 15.0 - 17.3.1 (arm64e), iOS 15.0 - 18.7.1, 26.0 - 26.0.1 (A12/A13) and iOS 15.0 - 18.7.1 (arm64)"
+function parseReadme(txt){
+  const re=/iOS\s+([\d.]+)\s*-\s*([\d.]+)(?:\s*,\s*([\d.]+)\s*-\s*([\d.]+))?\s*\(([^)]+)\)/g,o={};let m;
+  while((m=re.exec(txt))){
+    const rg=[[m[1],m[2]]];if(m[3])rg.push([m[3],m[4]]);
+    if(rg.some(r=>cmp(r[0],r[1])>0))continue;
+    const t=m[5].toLowerCase().trim();
+    if(t==="arm64e"&&!o.arm64e)o.arm64e=rg;
+    else if(t.includes("a12")&&!o.a12)o.a12=rg;
+    else if(t==="arm64"&&!o.arm64)o.arm64=rg;
+  }
+  return(o.arm64e&&o.arm64)?{arm64:o.arm64,arm64e:o.arm64e,a12:o.a12||o.arm64e}:null;
 }
 
 // ---------- Text ----------
 const T = {
 en:{
  nDl:"Download",nGuide:"Install guide",nSileo:"Sileo missing?",nHelp:"Help",
- title:"Dopamine IPA Installer",sub:"Choose your iPhone and iOS version. We check compatibility and download the Dopamine IPA by opa334.",
- dev:"1. iPhone model",ver:"2. iOS version",selDev:"Select your iPhone",selVer:"Select iOS version",
- install:"Install",copy:"Copy download link",copied:"Link copied",
+ title:"Dopamine IPA Installer",sub:"Choose your iPhone and iOS version. We check compatibility and download the newest Dopamine IPA by opa334.",
+ dev:"1. iPhone model",ver:"2. iOS version",selDev:"Select your iPhone",selVer:"Select iOS version",other:"Other version…",otherPh:"Type your iOS version, e.g. 17.2.1",enter:"Type a valid iOS version, for example 17.2.1.",
+ install:"Install",copy:"Copy download link",copied:"Link copied",rels:"Download not starting? Open GitHub releases",
  ok:"Supported. {d} ({c}) can use Dopamine on iOS {v}.",no:"Not supported. Dopamine does not work on {c} devices with iOS {v}.",
- pick:"Pick a device and a version to check compatibility.",range:"{c} supports iOS {r}.",
- latest:"Latest release: {t} ({s} MB, {d})",
+ pick:"Pick a device and a version to check compatibility.",range:"{c} supports iOS {r}.",norange:"No Dopamine support for this chip.",
+ latest:"Newest release found: Dopamine {t} ({d}{s})",
+ srcLive:"Supported iOS versions were read live from the official Dopamine README.",srcFix:"Could not read the README, so a built-in table is used. Check github.com/opa334/Dopamine if unsure.",
+ news:"<strong>Always up to date.</strong> Every time you open this page it checks GitHub for the newest Dopamine release and for the iOS versions it supports. The Install button always downloads the newest IPA.",
  backup:"<strong>Backup recommended.</strong> Make a backup of your iPhone (iCloud, or Finder/iTunes on a computer) before you install.",
  gT:"Install guide",prog:"{n} of {m} steps done",
  steps:[
@@ -169,17 +198,20 @@ en:{
   ["The app closes at once or does not open","Turn on Developer Mode (iOS 16+) and restart. If 7 days passed, install the IPA again."],
   ["Sideloadly does not see my iPhone","Unlock the phone, tap Trust, change cable or USB port, and reinstall iTunes and iCloud from apple.com (Windows)."],
   ["Apple ID or &quot;too many apps&quot; error","Free accounts have weekly limits. Remove old sideloaded apps or use another Apple ID."],
+  ["The new Dopamine version will not install","Delete the old Dopamine app from the iPhone, download the IPA again and sideload it with the latest Sideloadly. Then open the new app and tap Jailbreak: the environment updates by itself."],
   ["The jailbreak fails or the phone reboots","Reboot, open Dopamine and try again. Some devices need several attempts."]],
  foot:"Unofficial download helper. Dopamine is made by <a href='https://github.com/opa334/Dopamine' target='_blank' rel='noopener'>opa334</a>. Use at your own risk."
 },
 ru:{
  nDl:"Скачать",nGuide:"Инструкция",nSileo:"Нет Sileo?",nHelp:"Помощь",
- title:"Установка Dopamine (IPA)",sub:"Выберите iPhone и версию iOS. Мы проверим совместимость и скачаем IPA Dopamine от opa334.",
- dev:"1. Модель iPhone",ver:"2. Версия iOS",selDev:"Выберите iPhone",selVer:"Выберите версию iOS",
- install:"Установить",copy:"Скопировать ссылку",copied:"Ссылка скопирована",
+ title:"Установка Dopamine (IPA)",sub:"Выберите iPhone и версию iOS. Мы проверим совместимость и скачаем самый новый IPA Dopamine от opa334.",
+ dev:"1. Модель iPhone",ver:"2. Версия iOS",selDev:"Выберите iPhone",selVer:"Выберите версию iOS",other:"Другая версия…",otherPh:"Введите версию iOS, например 17.2.1",enter:"Введите корректную версию iOS, например 17.2.1.",
+ install:"Установить",copy:"Скопировать ссылку",copied:"Ссылка скопирована",rels:"Скачивание не начинается? Открыть релизы на GitHub",
  ok:"Поддерживается. {d} ({c}) может использовать Dopamine на iOS {v}.",no:"Не поддерживается. Dopamine не работает на устройствах {c} с iOS {v}.",
- pick:"Выберите устройство и версию, чтобы проверить совместимость.",range:"{c} поддерживает iOS {r}.",
- latest:"Последний релиз: {t} ({s} МБ, {d})",
+ pick:"Выберите устройство и версию, чтобы проверить совместимость.",range:"{c} поддерживает iOS {r}.",norange:"Для этого чипа Dopamine не поддерживается.",
+ latest:"Найден новейший релиз: Dopamine {t} ({d}{s})",
+ srcLive:"Поддерживаемые версии iOS прочитаны в реальном времени из официального README Dopamine.",srcFix:"README прочитать не удалось, используется встроенная таблица. Если не уверены, проверьте github.com/opa334/Dopamine.",
+ news:"<strong>Всегда актуально.</strong> При каждом открытии страница проверяет на GitHub самый новый релиз Dopamine и поддерживаемые версии iOS. Кнопка «Установить» всегда скачивает самый новый IPA.",
  backup:"<strong>Рекомендуем сделать резервную копию.</strong> Перед установкой сделайте копию iPhone (iCloud или Finder/iTunes на компьютере).",
  gT:"Инструкция по установке",prog:"Выполнено шагов: {n} из {m}",
  steps:[
@@ -206,6 +238,7 @@ ru:{
   ["Приложение сразу закрывается или не открывается","Включите режим разработчика (iOS 16+) и перезагрузитесь. Если прошло 7 дней, установите IPA заново."],
   ["Sideloadly не видит iPhone","Разблокируйте телефон, нажмите «Доверять», смените кабель или порт и переустановите iTunes и iCloud с apple.com (Windows)."],
   ["Ошибка Apple ID или «слишком много приложений»","У бесплатных аккаунтов есть недельный лимит. Удалите старые приложения или используйте другой Apple ID."],
+  ["Новая версия Dopamine не устанавливается","Удалите старое приложение Dopamine с iPhone, скачайте IPA заново и установите через свежий Sideloadly. Затем откройте новое приложение и нажмите Jailbreak: среда обновится сама."],
   ["Джейлбрейк не проходит или телефон перезагружается","Перезагрузите телефон, откройте Dopamine и повторите. Иногда нужно несколько попыток."]],
  foot:"Неофициальный помощник для загрузки. Dopamine создан <a href='https://github.com/opa334/Dopamine' target='_blank' rel='noopener'>opa334</a>. Используйте на свой риск."
 }};
@@ -228,22 +261,30 @@ function fillVersions(){
   v.innerHTML="";v.add(new Option(T[lang].selVer,""));
   const d=$("device").value;
   v.disabled=d==="";
-  if(d!==""){VERSIONS.filter(x=>cmp(x,DEVICES[d][2])<=0).reverse().forEach(x=>v.add(new Option(x,x)))}
+  if(d!==""){
+    VERSIONS.filter(x=>cmp(x,DEVICES[d][2])<=0).reverse().forEach(x=>v.add(new Option(x,x)));
+    v.add(new Option(T[lang].other,"__other"));
+  }
   v.value=[...v.options].some(o=>o.value===keep)?keep:"";
 }
 function check(){
-  const d=$("device").value,v=$("version").value,r=$("result"),b=$("install"),t=T[lang];
+  const d=$("device").value,sel=$("version").value,r=$("result"),b=$("install"),t=T[lang],oth=$("other");
   r.className="";b.disabled=true;
+  oth.style.display=sel==="__other"?"block":"none";oth.placeholder=t.otherPh;
+  $("src").textContent=t[srcLive?"srcLive":"srcFix"];
   if(d===""){r.textContent=t.pick;return}
-  const [name,chip]=DEVICES[d];
-  if(v===""){r.textContent=f(t.range,{c:chip,r:RANGES[chip]});return}
+  const [name,chip]=DEVICES[d],g=grp(chip);
+  const rangeTxt=g?f(t.range,{c:chip,r:fmt(g)}):t.norange;
+  if(sel===""){r.textContent=rangeTxt;return}
+  const v=sel==="__other"?oth.value.trim():sel;
+  if(sel==="__other"&&!/^\d+(\.\d+){1,2}$/.test(v)){r.textContent=t.enter;return}
   if(supported(chip,v)){r.className="ok";r.textContent=f(t.ok,{d:name,c:chip,v});b.disabled=false}
-  else{r.className="no";r.textContent=f(t.no,{c:chip,v})+" "+f(t.range,{c:chip,r:RANGES[chip]})}
-  store.set("dev",d);store.set("ver",v);
+  else{r.className="no";r.textContent=f(t.no,{c:chip,v})+" "+rangeTxt}
+  store.set("dev",d);store.set("ver",sel);
 }
 function renderRel(){
   if(!relInfo){$("rel").textContent="";return}
-  $("rel").textContent=f(T[lang].latest,relInfo);
+  $("rel").textContent=f(T[lang].latest,{t:relInfo.t,d:relInfo.d,s:relInfo.s?", "+relInfo.s+" MB":""});
 }
 function renderSteps(){
   const done=JSON.parse(store.get("done")||"[]"),S=T[lang].steps,ul=$("steps");
@@ -271,6 +312,7 @@ $("l-en").onclick=()=>{lang="en";store.set("lang",lang);render()};
 $("l-ru").onclick=()=>{lang="ru";store.set("lang",lang);render()};
 $("device").onchange=()=>{fillVersions();check()};
 $("version").onchange=check;
+$("other").oninput=check;
 $("install").onclick=()=>{window.location.href=IPA_URL};
 $("copy").onclick=async()=>{
   try{await navigator.clipboard.writeText(IPA_URL)}catch(e){prompt("URL",IPA_URL);return}
@@ -282,13 +324,20 @@ render();
 {const d=store.get("dev"),v=store.get("ver");
  if(d!==null&&DEVICES[d]){$("device").value=d;fillVersions();if(v&&[...$("version").options].some(o=>o.value===v))$("version").value=v;check()}}
 
-// Latest release info from GitHub (falls back silently)
+// 1) Newest release + its IPA (falls back silently to the "latest/download" link)
 fetch("https://api.github.com/repos/"+REPO+"/releases/latest").then(r=>r.ok?r.json():Promise.reject()).then(j=>{
   const a=(j.assets||[]).find(x=>/\.ipa$/i.test(x.name));
   if(a)IPA_URL=a.browser_download_url;
-  relInfo={t:j.tag_name,s:a?(a.size/1048576).toFixed(1):"?",d:(j.published_at||"").slice(0,10)};
+  relInfo={t:j.tag_name,s:a?(a.size/1048576).toFixed(1):"",d:(j.published_at||"").slice(0,10)};
   renderRel();
 }).catch(()=>{});
+
+// 2) Supported iOS ranges from the official README (falls back to the built-in table)
+fetch("https://api.github.com/repos/"+REPO+"/readme",{headers:{Accept:"application/vnd.github.raw+json"}})
+  .then(r=>r.ok?r.text():Promise.reject()).then(txt=>{
+    const p=parseReadme(txt);
+    if(p){RG=p;srcLive=true;check()}
+  }).catch(()=>{});
 </script>
 </body>
 </html>
